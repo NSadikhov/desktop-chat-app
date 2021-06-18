@@ -1,0 +1,41 @@
+@font-face {
+    font-family: custom-font;
+    font-style: normal;
+    font-weight: 500;
+    /* src: url("assets/fonts/Quicksand-VariableFont_wght.ttf") format("truetype"); */
+    src: url("assets/fonts/e-Ukraine-Regular.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: emoji-font;
+    font-style: normal;
+    src: url("assets/fonts/Symbola-Emoji.woff") format("woff");
+}
+
+*,
+*::before,
+*::after {
+    /* font-family: "Quicksand", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; */
+    font-family: custom-font, Roboto, sans-serif, -apple-system, BlinkMacSystemFont;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    outline: none;
+    border: none;
+    user-select: none;
+}
+
+:root {
+    --light-purple-clr: #b22d91;
+    --dark-purple-clr: #312a6c;
+    --light-gray-bg-clr: #cccccc;
+    --slightly-gray-bg-clr: #b8b8b8;
+    --light-gray-txt-clr: #555050;
+    --df-padding: 5px 12.5px;
+    --df-border: 1px solid black;
+}
+
+body {
+    cursor: default;
+    /* font-size: 1rem; */
+}
