@@ -20,8 +20,8 @@ npm install && npm start
 
 ## Structure
 
-Communication between backend and frontend is handled by the Electron framework in an isolated context form (main and renderer). Frontend will
-be exposed only to designated Node.js features allowed by the backend to prevent security issues (Cross-site-scripting attacks)
+Communication between backend and frontend is handled by the Electron framework in an isolated context form (main and renderer). Frontend is
+to be exposed only to designated Node.js features allowed by the backend to prevent security issues (Cross-site-scripting attacks)
 
 ## Encryption
 
