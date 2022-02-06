@@ -1,5 +1,5 @@
 import { db, auth, storage, firebase } from '../../db';
-import { READ_MESSAGES, SET_CHATS, SET_LOCAL_FILE_PATH, SET_MESSAGES, SET_NEW_MESSAGE, SET_USER_ONLINE, UPDATE_CHAT } from '../types';
+import { READ_MESSAGES, SET_CHATS, SET_CLOUD, SET_LOCAL_FILE_PATH, SET_MESSAGES, SET_NEW_MESSAGE, SET_USER_ONLINE, UPDATE_CHAT, DELETE_CHAT } from '../types';
 
 export const getAllChats = () => async (dispatch) => {
 
@@ -9,35 +9,43 @@ export const getAllChats = () => async (dispatch) => {
         query.forEach(each => {
             let isFirst = true;
             each.ref.onSnapshot({ includeMetadataChanges: false }, async snapshot => {
-                const dataObj = snapshot.data();
-                if (isFirst || dataObj.nonSeenMessages !== 0) {
-                    const doc = (await snapshot.ref.collection('Messages').orderBy('time', 'desc').limit(1).get());
-                    const docDetails = !doc.empty && { ...doc.docs[0].data(), id: doc.docs[0].id };
-                    const result = {
-                        ...dataObj,
-                        lastMessageInfo: docDetails ? (docDetails.message ? {
-                            ...docDetails,
-                            message: dataObj.shared_key ? await bridge.cryptoApi.decryptMessage(docDetails.message, dataObj.shared_key) : docDetails.message
-                        } : docDetails) : null,
-                        id: each.id,
-                        toId: dataObj.userIDs.find(each => each !== auth.currentUser.uid)
-                    };
+                if (snapshot.exists) {
+                    const dataObj = snapshot.data();
+                    if (isFirst || dataObj.nonSeenMessages !== 0) {
+                        const doc = (await snapshot.ref.collection('Messages').orderBy('time', 'desc').limit(1).get());
+                        const docDetails = !doc.empty && { ...doc.docs[0].data(), id: doc.docs[0].id };
+                        const result = {
+                            ...dataObj,
+                            lastMessageInfo: docDetails ? (docDetails.message ? {
+                                ...docDetails,
+                                message: dataObj.shared_key ? await bridge.cryptoApi.decryptMessage(docDetails.message, dataObj.shared_key) : docDetails.message
+                            } : docDetails) : null,
+                            id: each.id,
+                            toId: dataObj.userIDs.find(each => each !== auth.currentUser.uid)
+                        };
 
-                    dispatch({
-                        type: isFirst ? SET_CHATS : UPDATE_CHAT,
-                        payload: [result]
-                    });
+                        dispatch({
+                            type: isFirst ? SET_CHATS : UPDATE_CHAT,
+                            payload: [result]
+                        });
 
-                    !isFirst && dispatch({
-                        type: SET_NEW_MESSAGE,
-                        id: result.id,
-                        payload: [result.lastMessageInfo]
-                    })
-                    isFirst = false;
+                        console.log(isFirst);
+                        !isFirst && dispatch({
+                            type: SET_NEW_MESSAGE,
+                            id: result.id,
+                            payload: [result.lastMessageInfo]
+                        })
+                        isFirst = false;
+                    } else {
+                        dispatch({
+                            type: READ_MESSAGES,
+                            id: each.id
+                        });
+                    }
                 } else {
                     dispatch({
-                        type: READ_MESSAGES,
-                        id: each.id
+                        type: DELETE_CHAT,
+                        id: snapshot.id
                     });
                 }
             }, err => console.log(err))
@@ -59,6 +67,23 @@ export const getOnlineUsers = () => dispatch => {
             }
         }, err => console.log(err));
 }
+
+export const getCloudContent = () => dispatch => {
+    return db.collection(`Clouds/${auth.currentUser.uid}/Messages`).orderBy('time', 'desc').onSnapshot //.limit(50).get()
+        (snapshot => {
+            let result = [];
+            snapshot.docs.forEach(each => {
+                const dataObj = each.data();
+                result.push({ ...dataObj, id: each.id });
+            });
+
+            return result.length > 0 && dispatch({
+                type: SET_CLOUD,
+                payload: result,
+            });
+        }, err => console.log(err));
+}
+
 
 export const getChatMessages = (id, sharedKey) => async dispatch => {
     return db.collection(`Chats/${id}/Messages`).orderBy('time', 'desc').get() //.limit(50).get()
@@ -82,31 +107,51 @@ export const getChatMessages = (id, sharedKey) => async dispatch => {
 }
 
 export const sendMessageOrFile = ({ id, message, file, lastMessageInfo, nonSeenMessages, sharedKey }) => async dispatch => {
-    let messageFileOBJ = message ? {
-        message: sharedKey ? await bridge.cryptoApi.encryptMessage(message, sharedKey) : message,
-    } : { file };
+    if (id === "Cloud") {
 
-    messageFileOBJ = {
-        ...messageFileOBJ,
-        sentBy: auth.currentUser.uid,
-        seen: false,
-        time: firebase.firestore.FieldValue.serverTimestamp()
+        let messageFileOBJ = message ? { message } : { file };
+
+        messageFileOBJ = {
+            ...messageFileOBJ,
+            sentBy: auth.currentUser.uid,
+            seen: true,
+            time: firebase.firestore.FieldValue.serverTimestamp()
+        }
+
+        return db.collection(`/Clouds/${auth.currentUser.uid}/Messages`).add(messageFileOBJ)
+            .catch(err => console.log(err));
     }
+    else {
+        let messageFileOBJ = message ? {
+            message: sharedKey ? await bridge.cryptoApi.encryptMessage(message, sharedKey) : message,
+        } : { file };
 
-    let counter = 1;
-    if (lastMessageInfo &&
-        lastMessageInfo.sentBy === auth.currentUser.uid &&
-        !lastMessageInfo.seen) counter = nonSeenMessages + 1;
+        messageFileOBJ = {
+            ...messageFileOBJ,
+            sentBy: auth.currentUser.uid,
+            seen: false,
+            time: firebase.firestore.FieldValue.serverTimestamp()
+        }
 
-    return db.collection(`/Chats/${id}/Messages`).add(messageFileOBJ)
-        .then(() => db.doc(`/Chats/${id}`).update({ nonSeenMessages: counter }))
-        .catch(err => console.log(err));
+        console.log(messageFileOBJ);
+
+        let counter = 1;
+        if (lastMessageInfo &&
+            lastMessageInfo.sentBy === auth.currentUser.uid &&
+            !lastMessageInfo.seen) counter = nonSeenMessages + 1;
+
+        return db.collection(`/Chats/${id}/Messages`).add(messageFileOBJ)
+            .then(() => db.doc(`/Chats/${id}`).update({ nonSeenMessages: counter }))
+            .catch(err => console.log(err));
+    }
 }
 
 export const readMessages = (id) => dispatch =>
     db.collection(`/Chats/${id}/Messages`).where('sentBy', '!=', auth.currentUser.uid).where('seen', '==', false).get()
         .then(snapshot => {
+            console.log(snapshot);
             if (!snapshot.empty) {
+                console.log(id);
                 const batch = db.batch();
                 snapshot.forEach(each => batch.update(each.ref, { seen: true }));
                 batch.update(db.doc(`/Chats/${id}`), { nonSeenMessages: 0 });
@@ -116,17 +161,30 @@ export const readMessages = (id) => dispatch =>
         .catch(err => console.log(err));
 
 
-export const uploadFiles = (files, chatId, lastMessageInfo, nonSeenMessages) => dispatch =>
-    Promise.all(files.map(each => storage.ref(`Files/${chatId}/${each.name}`).put(each)))
-        .then(result => result.forEach(async each => dispatch(sendMessageOrFile({
-            id: chatId,
-            file: {
-                url: await each.ref.getDownloadURL(), name: each.metadata.name
-            },
-            lastMessageInfo,
-            nonSeenMessages
-        }))))
-        .catch(err => console.log(err));
+export const uploadFiles = (files, chatId, lastMessageInfo, nonSeenMessages) => dispatch => {
+    if (chatId === "Cloud") {
+        Promise.all(files.map(each => storage.ref(`Files/${auth.currentUser.uid}/${each.name}`).put(each)))
+            .then(result => result.forEach(async each => dispatch(sendMessageOrFile({
+                id: chatId,
+                file: {
+                    url: await each.ref.getDownloadURL(), name: each.metadata.name
+                },
+            }))))
+            .catch(err => console.log(err));
+    }
+    else {
+        Promise.all(files.map(each => storage.ref(`Files/${chatId}/${each.name}`).put(each)))
+            .then(result => result.forEach(async each => dispatch(sendMessageOrFile({
+                id: chatId,
+                file: {
+                    url: await each.ref.getDownloadURL(), name: each.metadata.name
+                },
+                lastMessageInfo,
+                nonSeenMessages
+            }))))
+            .catch(err => console.log(err));
+    }
+}
 
 export const downloadFile = (url, file_name, id, index) => dispatch => bridge.fileApi.downloadFile(url, file_name).then(path => dispatch({
     type: SET_LOCAL_FILE_PATH,

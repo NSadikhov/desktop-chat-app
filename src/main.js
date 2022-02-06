@@ -33,7 +33,7 @@ if (require('electron-squirrel-startup')) { // eslint-disable-line global-requir
   app.quit();
 }
 
-// console.log(process.execPath)
+console.log(process.execPath)
 // * Windows Taskbar Tasks
 app.setUserTasks([{
   program: path.join(app.getPath('downloads'), 'eye-icon.png'),// process.execPath,
@@ -53,6 +53,8 @@ const createWindow = (event, launchInfo) => {
     minHeight: 600,
     icon: path.join(__dirname, 'assets/images/telex-new.ico'), // './src/Assets/Images/icon.ico',
     backgroundColor: '#fff',
+    center: true,
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
       worldSafeExecuteJavaScript: true,
@@ -63,7 +65,7 @@ const createWindow = (event, launchInfo) => {
   });
 
   // * To Remove Menu Bar
-  mainWindow.removeMenu();
+  // mainWindow.removeMenu();
 
   // mainWindow.setProgressBar(0.5, { mode: 'normal' })
 
@@ -100,6 +102,8 @@ const createWindow = (event, launchInfo) => {
   mainWindow.on('blur', () => mainWindow.webContents.send('ping', { isFocused: false }));
 
   mainWindow.on('close', () => mainWindow.webContents.send('ping', { isFocused: false }))
+
+  mainWindow.webContents.send('',)
 
   // showNotification();
 };

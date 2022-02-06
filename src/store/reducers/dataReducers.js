@@ -3,6 +3,7 @@ import * as actionTypes from '../types';
 const initialState = {
     loading: false,
     chats: undefined,
+    cloud: undefined,
     onlineUsers: undefined
 }
 
@@ -12,6 +13,7 @@ export default function (state = initialState, action) {
         //     return { loading: true };
         case actionTypes.SET_CHATS:
             {
+                console.log(action.payload);
                 const data = state.chats ? state.chats.concat(action.payload) : action.payload;
                 data.sort((x, y) => {
                     const _y = y.lastMessageInfo ? y.lastMessageInfo.time : y.createdAt;
@@ -26,14 +28,25 @@ export default function (state = initialState, action) {
             }
         case actionTypes.UPDATE_CHAT:
             {
+                console.log(action.payload);
                 const data = state.chats.map(each => each.id === action.payload[0].id ? (each = action.payload[0]) : each);
-                data.sort((x, y) => y.lastMessageInfo.time - x.lastMessageInfo.time);
+                data.sort((x, y) => y.lastMessageInfo?.time - x.lastMessageInfo?.time);
+                return {
+                    ...state,
+                    chats: data
+                };
+            }
+        case actionTypes.DELETE_CHAT:
+            {
+                console.log(action.payload);
+                const data = state.chats.filter(each => each.id !== action.id);
                 return {
                     ...state,
                     chats: data
                 };
             }
         case actionTypes.SET_MESSAGES:
+            console.log(action.payload);
             return {
                 ...state,
                 [action.id]: {
@@ -41,7 +54,17 @@ export default function (state = initialState, action) {
                     // lastMessage: action.lastMessage
                 }
             };
+        case actionTypes.SET_CLOUD:
+            console.log(action.payload);
+            return {
+                ...state,
+                Cloud: {
+                    data: action.payload,
+                    // lastMessage: action.lastMessage
+                }
+            };
         case actionTypes.SET_NEW_MESSAGE:
+            console.log(action.payload);
             return {
                 ...state,
                 [action.id]: {
@@ -56,6 +79,7 @@ export default function (state = initialState, action) {
             }
         case actionTypes.SET_LOCAL_FILE_PATH: {
             state[action.id].data[action.index].localPath = action.payload;
+            console.log(state);
             return state;
         }
         case actionTypes.READ_MESSAGES:

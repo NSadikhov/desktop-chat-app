@@ -14,3 +14,6 @@ export const SET_NEW_MESSAGE = 'SET_NEW_MESSAGE';
 export const SET_USER_ONLINE = 'SET_USER_ONLINE';
 export const READ_MESSAGES = 'READ_MESSAGES';
 export const SET_LOCAL_FILE_PATH = 'SET_LOCAL_FILE_PATH';
+export const SET_CLOUD = 'SET_CLOUD';
+export const DELETE_CHAT = 'DELETE_CHAT';
+

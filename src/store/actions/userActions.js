@@ -1,5 +1,5 @@
 import { db, auth, storage, firebase } from '../../db';
-import { SET_CREDENTIALS, SET_PROFILE_PHOTO, SET_PROFILE_INFO, SET_UNAUTHENTICATED } from '../types';
+import { SET_CREDENTIALS, SET_PROFILE_PHOTO, SET_PROFILE_INFO, SET_UNAUTHENTICATED, SET_CHATS, UPDATE_CHAT, SET_NEW_MESSAGE, DELETE_CHAT } from '../types';
 import { getAllChats, getOnlineUsers } from './dataActions';
 
 export const registerNewUser = (userInfo) => dispatch =>
@@ -40,6 +40,7 @@ export const logOutUser = () => dispatch => auth.signOut();
 export const onAuthStateChange = (data) => dispatch => auth.onAuthStateChanged((user) => {
     if (user) {
         console.log('authenticated');
+        console.log(user);
         dispatch({ type: SET_CREDENTIALS, payload: user });
         dispatch(setUserStatus(true));
         dispatch(getOnlineUsers());
@@ -87,6 +88,22 @@ export const editProfileInfo = ({ first_name, last_name }) => async dispatch => 
         .catch(err => console.log(err));
 }
 
+export const deleteContact = (chatId) => dispatch =>
+    db.doc(`/Chats/${chatId}`).get()
+        .then(docRef => {
+            if (docRef.exists) {
+                let data = docRef.data();
+                let userIDs = data.userIDs.map(each => each === auth.currentUser.uid ? null : each);
+                docRef.ref.update({ userIDs: userIDs });
+            }
+        })
+        .then(() => dispatch({
+            type: DELETE_CHAT,
+            id: chatId
+        }))
+        .catch(err => console.log(err));
+
+
 export const addNewContact = (phoneNumber) => dispatch => {
     let dataDetails;
     db.collection('Users').where('phone_number', '==', phoneNumber).limit(1).get()
@@ -113,6 +130,50 @@ export const addNewContact = (phoneNumber) => dispatch => {
                 createdAt: firebase.firestore.Timestamp.now()
             })
         )
+        .then((docRef) => {
+            let isFirst = true;
+            docRef.onSnapshot({ includeMetadataChanges: false }, async snapshot => {
+                if (snapshot.exists) {
+                    const dataObj = snapshot.data();
+                    if (isFirst || dataObj.nonSeenMessages !== 0) {
+                        const doc = (await snapshot.ref.collection('Messages').orderBy('time', 'desc').limit(1).get());
+                        const docDetails = !doc.empty && { ...doc.docs[0].data(), id: doc.docs[0].id };
+                        const result = {
+                            ...dataObj,
+                            lastMessageInfo: docDetails ? (docDetails.message ? {
+                                ...docDetails,
+                                message: dataObj.shared_key ? await bridge.cryptoApi.decryptMessage(docDetails.message, dataObj.shared_key) : docDetails.message
+                            } : docDetails) : null,
+                            id: docRef.id,
+                            toId: dataObj.userIDs.find(each => each !== auth.currentUser.uid)
+                        };
+
+                        dispatch({
+                            type: isFirst ? SET_CHATS : UPDATE_CHAT,
+                            payload: [result]
+                        });
+
+                        !isFirst && dispatch({
+                            type: SET_NEW_MESSAGE,
+                            id: result.id,
+                            payload: [result.lastMessageInfo]
+                        })
+                        isFirst = false;
+                    } else {
+                        dispatch({
+                            type: READ_MESSAGES,
+                            id: each.id
+                        });
+                    }
+                }
+                else {
+                    dispatch({
+                        type: DELETE_CHAT,
+                        id: snapshot.id
+                    });
+                }
+            }, err => console.log(err))
+        })
         .then(() => dataDetails?.uid && db.doc(`/Status/${auth.currentUser.uid}`).update({
             allowedUserIds: firebase.firestore.FieldValue.arrayUnion(dataDetails.uid)
         }))

@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect, createRef } from 'react'
 import { useHistory } from 'react-router-dom';
 import classes from '../styles/home.module.css';
 
-import { uploadProfilePhoto, editProfileInfo, setUserStatus } from '../store/actions/userActions';
-import { sendMessageOrFile, getChatMessages, readMessages, uploadFiles, downloadFile } from '../store/actions/dataActions';
+import { uploadProfilePhoto, editProfileInfo, setUserStatus, deleteContact } from '../store/actions/userActions';
+import { sendMessageOrFile, getChatMessages, readMessages, uploadFiles, downloadFile, getCloudContent } from '../store/actions/dataActions';
 import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
 
@@ -50,7 +50,6 @@ import LogOut from '../components/LogOut';
 import EmojiList from '../components/EmojiList';
 
 
-
 const bgColors = [
     '#a695e7',
     '#7bc862',
@@ -70,7 +69,7 @@ const getRandomBgColor = () => bgColors[Math.floor(Math.random() * 8)];
 function Home(props) {
     const history = useHistory();
 
-    const { user: { credentials }, data, data: { chats, onlineUsers } } = props;
+    const { user: { credentials }, data, data: { chats, onlineUsers, Cloud } } = props;
 
     const [initials, setInitials] = useState('');
 
@@ -99,6 +98,7 @@ function Home(props) {
         }
         else {
             setSelectedChatId('Cloud');
+            if (!Cloud) props.getCloudContent();
         }
 
         textAreaRef.current?.focus();
@@ -146,8 +146,16 @@ function Home(props) {
     const handlePhotoChange = (e) => e.currentTarget.files && props.uploadProfilePhoto(e.currentTarget.files.item(0));
     const handleFileChange = (e) => {
         if (e.currentTarget.files) {
-            const data = chats.find(chat => chat.id === selectedChatId);
-            props.uploadFiles(Array.from(e.currentTarget.files), selectedChatId, data.lastMessageInfo, data.nonSeenMessages);
+
+            if (selectedChatId === 'Cloud') {
+                props.uploadFiles(
+                    Array.from(e.currentTarget.files),
+                    selectedChatId,
+                );
+            } else {
+                const data = chats.find(chat => chat.id === selectedChatId);
+                props.uploadFiles(Array.from(e.currentTarget.files), selectedChatId, data.lastMessageInfo, data.nonSeenMessages);
+            }
         }
     };
 
@@ -187,18 +195,31 @@ function Home(props) {
     const lastMessageRef = useRef(null);
     const handleMessageSubmit = () => {
         // TODO: fix Cloud chat
-        if (textAreaRef.current.value.trim() !== '' && selectedChatId !== 'Cloud') {
-            const data = chats.find(chat => chat.id === selectedChatId);
-            props.sendMessageOrFile({
-                id: selectedChatId,
-                message: textAreaRef.current.value,
-                lastMessageInfo: data.lastMessageInfo,
-                nonSeenMessages: data.nonSeenMessages,
-                sharedKey: data.shared_key
-            });
+        if (textAreaRef.current.value.trim() !== '') {
+            if (selectedChatId === 'Cloud') {
+                props.sendMessageOrFile({
+                    id: selectedChatId,
+                    message: textAreaRef.current.value,
+                });
+            }
+            else {
+                const data = chats.find(chat => chat.id === selectedChatId);
+                props.sendMessageOrFile({
+                    id: selectedChatId,
+                    message: textAreaRef.current.value,
+                    lastMessageInfo: data.lastMessageInfo,
+                    nonSeenMessages: data.nonSeenMessages,
+                    sharedKey: data.shared_key
+                });
+            }
         }
         textAreaRef.current.value = '';
         textAreaRef.current.focus();
+    }
+
+    const handleDeleteContact = (e) => {
+        props.deleteContact(selectedChatId);
+        setSelectedChatId(undefined);
     }
 
     const [isFocused, setIsFocused] = useState(true);
@@ -218,6 +239,7 @@ function Home(props) {
     const openFile = (path) => bridge.fileApi.openFile(path);
 
     const onBlur = () => {
+        console.log(2)
         setIsFocused(false);
         props.setUserStatus(false);
     }
@@ -227,6 +249,8 @@ function Home(props) {
     }, [lastMessageRef.current])
 
     useEffect(() => {
+        console.log(222);
+        console.log(isFocused);
         if (isFocused) handleReadMessages(selectedChatId);
     }, [chats])
 
@@ -330,7 +354,7 @@ function Home(props) {
                             <Badge variant='dot' overlap="circle" color="primary" anchorOrigin={{
                                 vertical: 'bottom',
                                 horizontal: 'right',
-                            }} className={classes.chat_photo_badge} data-active={onlineUsers[chat.toId]?.online}>
+                            }} className={classes.chat_photo_badge} data-active={onlineUsers?.[chat.toId]?.online}>
                                 {chat[chat.toId].photoURL ?
                                     <img src={chat[chat.toId].photoURL} className={classes.chat_box_photo} />
                                     :
@@ -451,34 +475,38 @@ function Home(props) {
                                 <div className={classes.chat_header}>
                                     <h1>{selectedChatData[selectedChatData.toId].displayName ?? selectedChatData[selectedChatData.toId].phoneNumber}</h1>
                                     {selectedChatId !== 'Cloud' &&
-                                        <span>last seen {onlineUsers[selectedChatData.toId]?.lastSeen ? getLastSeen(onlineUsers[selectedChatData.toId].lastSeen) : 'recently'}</span>
+                                        <span>last seen {onlineUsers?.[selectedChatData.toId]?.lastSeen ? getLastSeen(onlineUsers[selectedChatData.toId].lastSeen) : 'recently'}</span>
                                     }
                                 </div>
                                 <div className={classes.chat_container}>
                                     {data[selectedChatId]?.data?.map((each, index) =>
-                                        <div ref={index === 0 ? lastMessageRef : null} key={each.id} className={each.sentBy === credentials.uid ? classes.message_right : classes.message_left}>
-                                            {each.message ?
-                                                <p className={classes.selectable}>
-                                                    {each.message}
-                                                </p>
-                                                :
-                                                <div className={classes.chat_container_message_content}>
-                                                    <DescriptionRoundedIcon className={classes.chat_container_message_file_icon} onClick={() => !each.localPath ? handleDownloadFile(each.file.url, each.file.name, selectedChatId, index) : openFile(each.localPath)} />
+                                        each?.time ?
+                                            <div ref={index === 0 ? lastMessageRef : null} key={each.id} className={each.sentBy === credentials.uid ? classes.message_right : classes.message_left}>
+                                                {each.message ?
                                                     <p className={classes.selectable}>
-                                                        {each.file.name}
+                                                        {each.message}
                                                     </p>
-                                                </div>
-                                            }
-                                            <div className={classes.chat_container_message_time}>
-                                                <span>{getTime(each.time)}</span>
-                                                {each.sentBy === credentials.uid &&
-                                                    (each.seen ?
-                                                        <DoneAllRoundedIcon color='primary' className={classes.tick} /> :
-                                                        <DoneRoundedIcon color='primary' className={classes.tick} />
-                                                    )
+                                                    :
+                                                    <div className={classes.chat_container_message_content}>
+                                                        <DescriptionRoundedIcon className={classes.chat_container_message_file_icon} onClick={() => !each.localPath ? handleDownloadFile(each.file.url, each.file.name, selectedChatId, index) : openFile(each.localPath)} />
+                                                        <p className={classes.selectable}>
+                                                            {each.file.name}
+                                                        </p>
+                                                    </div>
                                                 }
+                                                <div className={classes.chat_container_message_time}>
+                                                    <span>{getTime(each.time)}</span>
+                                                    {each.sentBy === credentials.uid &&
+                                                        (each.seen ?
+                                                            <DoneAllRoundedIcon color='primary' className={classes.tick} /> :
+                                                            <DoneRoundedIcon color='primary' className={classes.tick} />
+                                                        )
+                                                    }
+                                                </div>
                                             </div>
-                                        </div>
+                                            :
+                                            null
+
                                     )}
 
                                 </div>
@@ -535,7 +563,7 @@ function Home(props) {
                                 <div className={classes.user_info_content}>
                                     <h1 className={classes.selectable}>{selectedChatData[selectedChatData.toId].displayName ?? selectedChatData[selectedChatData.toId].phoneNumber}</h1>
                                     {selectedChatId !== 'Cloud' &&
-                                        <span>last seen {onlineUsers[selectedChatData.toId]?.lastSeen ? getLastSeen(onlineUsers[selectedChatData.toId].lastSeen, true) : 'recently'}</span>
+                                        <span>last seen {onlineUsers?.[selectedChatData.toId]?.lastSeen ? getLastSeen(onlineUsers[selectedChatData.toId].lastSeen, true) : 'recently'}</span>
                                     }
                                 </div>
                             </div>
@@ -568,7 +596,7 @@ function Home(props) {
                                 </div>
                                 {selectedChatId !== 'Cloud' &&
                                     <div className={classes.bottom}>
-                                        <div>
+                                        <div onClick={handleDeleteContact}>
                                             <DeleteForeverRoundedIcon />
                                             <span>Delete contact</span>
                                         </div>
@@ -613,7 +641,7 @@ const mapStateToProps = (state) => ({
     data: state.data
 })
 
-const mapActionsToProps = { uploadProfilePhoto, editProfileInfo, sendMessageOrFile, uploadFiles, downloadFile, getChatMessages, setUserStatus, readMessages };
+const mapActionsToProps = { uploadProfilePhoto, editProfileInfo, sendMessageOrFile, uploadFiles, downloadFile, getChatMessages, deleteContact, getCloudContent, setUserStatus, readMessages };
 
 Home.propTypes = {
     user: PropTypes.object.isRequired,
