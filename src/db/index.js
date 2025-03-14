@@ -3,6 +3,7 @@ import 'firebase/firestore';
 import 'firebase/storage';
 import 'firebase/auth';
 
+// Outdated Firebase Config
 // TODO: Implement Environment Variables for firebaseConfig
 const firebaseConfig = {
     apiKey: "AIzaSyDIqqNlNnki8fxn121ZJfnianNwG8mUZn0",

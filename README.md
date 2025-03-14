@@ -9,19 +9,59 @@ Telex is a desktop communication application, built with [Electron](https://www.
 
 ## Getting Started
 
-Clone and run from source:
+### Prerequisites
+
+Ensure you have the following installed:
+- Node.js
+- npm (Node Package Manager)
+
+### Installation
+
+Clone the repository:
 ```
 git clone https://github.com/NSadikhov/desktop-chat-app.git
 ```
-In a choice of command-line interpreter (<u>in administrator mode</u>), navigate to the cloned **desktop-chat-app** folder:
+
+Navigate to the project directory:
 ```
-npm install && npm start
+cd desktop-chat-app
 ```
 
-## Structure
+Install the dependencies:
+```
+npm install
+```
 
-Communication between backend and frontend is handled by the Electron framework in an isolated context form (main and renderer). Frontend is
-to be exposed only to designated Node.js features allowed by the backend to prevent security issues (Cross-site-scripting attacks)
+### Running the Application
+
+Start the application:
+```
+npm start
+```
+
+## Project Structure
+
+The project is structured as follows:
+
+- **src**: Contains the source code for the application.
+  - **assets**: Contains static assets like fonts and images.
+  - **components**: Contains React components used in the application.
+  - **db**: Contains Firebase configuration and initialization.
+  - **store**: Contains Redux store configuration, actions, and reducers.
+  - **styles**: Contains CSS modules for styling components.
+  - **utils**: Contains utility functions.
+  - **views**: Contains React components representing different views/screens of the application.
+  - **main.js**: Entry point for the Electron main process.
+  - **preload.js**: Preload script for Electron to expose APIs to the renderer process.
+  - **renderer.js**: Entry point for the Electron renderer process.
+  - **index.html**: HTML template for the Electron renderer process.
+  - **index.css**: Global CSS styles.
+
+- **.gitignore**: Specifies files and directories to be ignored by Git.
+- **package.json**: Contains project metadata and dependencies.
+- **webpack.main.config.js**: Webpack configuration for the Electron main process.
+- **webpack.renderer.config.js**: Webpack configuration for the Electron renderer process.
+- **webpack.rules.js**: Webpack loader rules.
 
 ## Encryption
 
